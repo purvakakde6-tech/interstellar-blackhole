@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gargantua: Accretion Disk Simulation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #020208;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        #info-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 300;
+            letter-spacing: 3px;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+        p {
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="info-overlay">
+        <h1>GARGANTUA</h1>
+        <p>Gravitational Lensing & Accretion Disk Simulation</p>
+    </div>
+
+    <canvas id="spaceCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('spaceCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Resize handling
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Simulation parameters
+        const particles = [];
+        const numParticles = 2000;
+        const blackHoleRadius = 45;
+        
+        // Colors inspired by Interstellar (fiery copper, deep orange, neon blues/whites near the event horizon)
+        const colors = [
+            'rgba(255, 100, 50, ',  // Deep orange
+            'rgba(255, 180, 70, ',  // Fiery copper
+            'rgba(255, 230, 150, ', // Warm white
+            'rgba(200, 220, 255, ', // Subtle blue shifted
+            'rgba(255, 60, 0, '     // Hot red
+        ];
+
+        // Particle Constructor
+        class Particle {
+            constructor() {
+                this.reset();
+                // Randomize initial setup so they don't all start at the same angle
+                this.angle = Math.random() * Math.PI * 2;
+            }
+
+            reset() {
+                // Orbital distance from the center
+                this.orbit = Math.random() * 250 + blackHoleRadius * 1.5;
+                this.angle = 0;
+                // Keplerian-like velocity: faster closer to the black hole
+                this.speed = (Math.random() * 0.015 + 0.005) * (150 / this.orbit);
+                this.size = Math.random() * 1.5 + 0.5;
+                this.baseColor = colors[Math.floor(Math.random() * colors.length)];
+                // Randomize depth/tilt for a 3D effect
+                this.zMultiplier = Math.sin(this.orbit * 0.02) * 15;
+            }
+
+            update() {
+                this.angle += this.speed;
+                // Slowly spiral inwards toward the doom of the event horizon
+                this.orbit -= 0.1;
+
+                if (this.orbit < blackHoleRadius) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+
+                // --- 1. The Main Accretion Disk (Front) ---
+                // Standard 2D projection with tilt
+                let x1 = centerX + Math.cos(this.angle) * this.orbit;
+                let y1 = centerY + Math.sin(this.angle) * this.orbit * 0.25; // Flattened for tilt
+
+                // --- 2. The Gravitational Lensing Effect (The "Halo") ---
+                // Light from the back of the disk is bent by gravity over the top and bottom
+                let x2 = centerX + Math.cos(this.angle) * this.orbit;
+                // Bending the Y coordinate based on proximity to create the iconic cross-halo look
+                let distortion = Math.sin(this.angle) > 0 ? -1 : 1;
+                let y2 = centerY + distortion * (blackHoleRadius + (this.orbit * 0.6));
+
+                // Dynamic opacity based on distance (brighter near the edge)
+                let alpha = Math.min(1, (this.orbit - blackHoleRadius) / 50);
+
+                // Draw primary disk particle
+                ctx.beginPath();
+                ctx.arc(x1, y1, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.baseColor + alpha + ')';
+                ctx.fill();
+
+                // Draw lensed halo particle (only if it's behind or severely bent)
+                if (Math.sin(this.angle) < 0.2) {
+                    ctx.beginPath();
+                    ctx.arc(x2, y2, this.size * 0.8, 0, Math.PI * 2);
+                    ctx.fillStyle = this.baseColor + (alpha * 0.4) + ')'; // slightly fainter
+                    ctx.fill();
+                }
+            }
+        }
+
+        // Initialize particle array
+        for (let i = 0; i < numParticles; i++) {
+            particles.push(new Particle());
+        }
+
+        // Background Starfield Generation
+        const stars = [];
+        for (let i = 0; i < 200; i++) {
+            stars.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                size: Math.random() * 1,
+                alpha: Math.random()
+            });
+        }
+
+        function drawStars() {
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            stars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // Animation Loop
+        function animate() {
+            // Slight motion blur trails
+            ctx.fillStyle = 'rgba(2, 2, 8, 0.15)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawStars();
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            // Render Back Lensed Ring Glow first
+            let glow = ctx.createRadialGradient(centerX, centerY, blackHoleRadius, centerX, centerY, blackHoleRadius * 4);
+            glow.addColorStop(0, 'rgba(255, 120, 30, 0.2)');
+            glow.addColorStop(0.2, 'rgba(255, 60, 0, 0.05)');
+            glow.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, blackHoleRadius * 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Update and draw particles
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            // The Shadow of the Black Hole (Event Horizon)
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, blackHoleRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#000000';
+            ctx.fill();
+            
+            // Absolute edge glow
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, blackHoleRadius + 1, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 200, 100, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            requestAnimationFrame(animate);
+        }
+
+        // Start animation
+        animate();
+
+        // Keep canvas dynamic if window sizes change dynamically on GitHub mobile/desktop
+        window.addEventListener('resize', () => {
+            stars.length = 0;
+            for (let i = 0; i < 200; i++) {
+                stars.push({
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    size: Math.random() * 1,
+                    alpha: Math.random()
+                });
+            }
+        });
+    </script>
+</body>
+</html>
